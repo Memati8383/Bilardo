@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billiards Master - Pro Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .pool-felt {
+            background-color: #2e8b57;
+            background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 80%);
+        }
+        canvas { touch-action: none; }
+        .overlay { display: flex; backdrop-filter: blur(12px); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        @keyframes message-up {
+            0% { transform: translateY(20px) scale(0.5); opacity: 0; }
+            20% { transform: translateY(0) scale(1.1); opacity: 1; }
+            80% { transform: translateY(-30px) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+        .status-msg { animation: message-up 1.2s forwards; }
+    </style>
+</head>
+<body class="bg-slate-950 h-screen flex flex-col items-center justify-center text-white select-none overflow-hidden">
+
+    <div id="gameOverlay" class="overlay fixed inset-0 z-50 items-center justify-center bg-black/80">
+        <div class="bg-slate-900 border border-white/10 p-12 rounded-[3rem] text-center shadow-2xl max-w-md w-full mx-4">
+            <div id="statusIcon" class="text-7xl mb-6 animate-bounce">8️⃣</div>
+            <h2 id="statusTitle" class="text-5xl font-black mb-4 italic tracking-tighter text-emerald-400">PRO POOL</h2>
+            <div id="statusDesc" class="text-slate-400 mb-8 space-y-2 text-sm">
+                <p>• Beyaz topu çek ve vuruş açısını ayarla.</p>
+                <p>• Tahmin çizgilerini kullanarak hedef al.</p>
+                <p class="text-amber-500 font-bold">• Siyah topu (8) en sona sakla!</p>
+            </div>
+            <button onclick="startGame()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-2xl transition-all active:scale-95 shadow-lg">
+                <span id="btnText">OYUNA BAŞLA</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="w-full max-w-[850px] flex justify-between items-center mb-6 px-4">
+        <div class="flex items-center gap-6">
+            <div class="bg-slate-900 px-8 py-3 rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
+                <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest text-center mb-1">SKOR</p>
+                <p id="scoreBoard" class="text-3xl font-mono text-white font-bold leading-none text-center relative z-10">00</p>
+            </div>
+            <h1 class="text-2xl font-black italic tracking-tighter">ULTIMATE<span class="text-emerald-500">POOL</span></h1>
+        </div>
+        <button onclick="showLobby()" class="bg-white/5 hover:bg-white/10 text-slate-400 font-bold px-6 py-3 rounded-xl transition-all border border-white/5">ANA MENÜ</button>
+    </div>
+
+    <div class="relative p-8 bg-gradient-to-br from-[#3e2723] to-[#1a0f0d] rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,1)] border-b-[12px] border-black/40">
+        <div id="gameMessages" class="absolute inset-0 flex items-center justify-center pointer-events-none z-20"></div>
+        <canvas id="poolTable" width="800" height="400" class="pool-felt rounded-xl shadow-[inset_0_0_60px_rgba(0,0,0,0.8)] relative z-10"></canvas>
+    </div>
+
+    <div class="mt-8 w-[750px] h-20 bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-3xl flex items-center px-4 gap-4 shadow-inner relative overflow-hidden">
+        <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-black/40 to-transparent z-10 pointer-events-none"></div>
+        <canvas id="pocketTray" width="700" height="40" class="z-0"></canvas>
+    </div>
+
+<script>
+    const canvas = document.getElementById('poolTable');
+    const ctx = canvas.getContext('2d');
+    const trayCanvas = document.getElementById('pocketTray');
+    const tctx = trayCanvas.getContext('2d');
+    const scoreEl = document.getElementById('scoreBoard');
+    const overlay = document.getElementById('gameOverlay');
+    const messageContainer = document.getElementById('gameMessages');
+
+    const friction = 0.985;
+    const ballRadius = 14;
+    const pocketRadius = 26;
+    let balls = [], pottedBalls = [], incomingBalls = [], isDragging = false, mousePos = { x: 0, y: 0 }, score = 0, isGameActive = false;
+
+    const pockets = [
+        { x: 12, y: 12 }, { x: 400, y: 8 }, { x: 788, y: 12 },
+        { x: 12, y: 388 }, { x: 400, y: 392 }, { x: 788, y: 388 }
+    ];
+
+    class Ball {
+        constructor(x, y, color, isCue = false, num = null) {
+            this.x = x; this.y = y; this.dx = 0; this.dy = 0;
+            this.color = color; this.isCue = isCue; this.num = num;
+            this.scale = 1;
+            this.isShrinking = false;
+            this.targetPocket = null;
+            this.trayX = -50;
+        }
+
+        draw(targetCtx = ctx) {
+            const currentRadius = ballRadius * this.scale;
+            if (currentRadius <= 0) return;
+
+            targetCtx.beginPath();
+            targetCtx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+            targetCtx.fillStyle = this.color;
+            targetCtx.fill();
+
+            let g = targetCtx.createRadialGradient(this.x - 4*this.scale, this.y - 4*this.scale, 2*this.scale, this.x, this.y, currentRadius);
+            g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'transparent');
+            targetCtx.fillStyle = g; targetCtx.fill();
+
+            if (this.num && this.scale > 0.5) {
+                targetCtx.fillStyle = (this.num === 8) ? '#fff' : '#000';
+                targetCtx.font = `bold ${11 * this.scale}px sans-serif`;
+                targetCtx.textAlign = "center";
+                targetCtx.fillText(this.num, this.x, this.y + (4 * this.scale));
+            }
+            targetCtx.closePath();
+        }
+
+        update() {
+            if (this.isShrinking) {
+                this.x += (this.targetPocket.x - this.x) * 0.15;
+                this.y += (this.targetPocket.y - this.y) * 0.15;
+                this.scale -= 0.08;
+                if (this.scale < 0) this.scale = 0;
+                this.draw();
+                return;
+            }
+            if (this.x + ballRadius > 800 || this.x - ballRadius < 0) this.dx *= -0.85;
+            if (this.y + ballRadius > 400 || this.y - ballRadius < 0) this.dy *= -0.85;
+            this.x += this.dx; this.y += this.dy;
+            this.dx *= friction; this.dy *= friction;
+            if (Math.abs(this.dx) < 0.1) this.dx = 0; 
+            if (Math.abs(this.dy) < 0.1) this.dy = 0;
+            this.draw();
+        }
+    }
+
+    function showStatusMessage(text, type = 'success') {
+        const msg = document.createElement('div');
+        const colorClass = type === 'success' ? 'text-emerald-400' : 'text-red-500';
+        msg.className = `status-msg absolute text-5xl font-black italic tracking-tighter ${colorClass}`;
+        msg.style.textShadow = "0 10px 30px rgba(0,0,0,0.5)";
+        msg.innerText = text;
+        messageContainer.appendChild(msg);
+        setTimeout(() => msg.remove(), 1200);
+    }
+
+    function startGame() { overlay.style.display = 'none'; resetGame(); isGameActive = true; }
+    function showLobby() { isGameActive = false; overlay.style.display = 'flex'; }
+
+    function resetGame() {
+        balls = []; pottedBalls = []; incomingBalls = []; score = 0; scoreEl.innerText = "00";
+        balls.push(new Ball(200, 200, '#ffffff', true));
+        const colors = ['#fbbf24', '#3b82f6', '#ef4444', '#a855f7', '#f97316', '#10b981', '#ec4899'];
+        let startX = 550, ballNo = 1;
+        for(let i=0; i<5; i++) {
+            for(let j=0; j<=i; j++) {
+                let color = (ballNo === 8) ? '#111827' : colors[ballNo % colors.length];
+                balls.push(new Ball(startX + (i*27), 200 - (i*13.5) + (j*27), color, false, ballNo++));
+            }
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        ctx.clearRect(0, 0, 800, 400);
+        tctx.clearRect(0, 0, 700, 40);
+        
+        pockets.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, pocketRadius, 0, Math.PI*2); ctx.fillStyle="#1a1a1a"; ctx.fill(); });
+        
+        pottedBalls.forEach((b, i) => { b.x = 25 + i * 32; b.y = 20; b.scale = 1; b.draw(tctx); });
+
+        for (let i = incomingBalls.length - 1; i >= 0; i--) {
+            let b = incomingBalls[i];
+            let targetX = 25 + (pottedBalls.length + i) * 32;
+            b.trayX += (targetX - b.trayX) * 0.1;
+            b.x = b.trayX; b.y = 20; b.scale = 1; b.draw(tctx);
+            if (Math.abs(b.trayX - targetX) < 0.5) pottedBalls.push(incomingBalls.splice(i, 1)[0]);
+        }
+
+        if(!isGameActive) return;
+
+        const cue = balls.find(b => b.isCue);
+
+        // --- Gelişmiş Tahmin Çizgileri ---
+        if (isDragging && cue && cue.dx === 0) {
+            const angle = Math.atan2(cue.y - mousePos.y, cue.x - mousePos.x);
+            const powerDist = Math.min(Math.sqrt((cue.x-mousePos.x)**2 + (cue.y-mousePos.y)**2)*0.2, 25);
+            
+            // 1. Güç Göstergesi (Vuruş sopası yönü)
+            ctx.beginPath(); ctx.moveTo(cue.x, cue.y); 
+            ctx.lineTo(cue.x - Math.cos(angle)*powerDist*5, cue.y - Math.sin(angle)*powerDist*5);
+            ctx.strokeStyle=`hsl(${120-powerDist*4}, 100%, 50%)`; ctx.lineWidth=5; ctx.lineCap="round"; ctx.stroke();
+
+            // 2. Işın İzleme (Raycasting)
+            let rayX = cue.x, rayY = cue.y, hitBall = null, rayDist = 0;
+            const maxRayDist = 800;
+
+            while (rayDist < maxRayDist && !hitBall) {
+                rayX += Math.cos(angle) * 4;
+                rayY += Math.sin(angle) * 4;
+                rayDist += 4;
+                if (rayX <= ballRadius || rayX >= 800-ballRadius || rayY <= ballRadius || rayY >= 400-ballRadius) break;
+                for (let b of balls) {
+                    if (b.isCue || b.isShrinking) continue;
+                    if (Math.sqrt((rayX-b.x)**2 + (rayY-b.y)**2) < ballRadius*2) { hitBall = b; break; }
+                }
+            }
+
+            // Beyaz topun yolu (Kesik çizgi)
+            ctx.setLineDash([5, 10]);
+            ctx.beginPath(); ctx.moveTo(cue.x, cue.y); ctx.lineTo(rayX, rayY);
+            ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Hedef topun yolu
+            if (hitBall) {
+                ctx.beginPath(); ctx.arc(rayX, rayY, ballRadius, 0, Math.PI*2);
+                ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.stroke();
+                
+                const targetAngle = Math.atan2(hitBall.y - rayY, hitBall.x - rayX);
+                ctx.beginPath(); ctx.moveTo(hitBall.x, hitBall.y);
+                ctx.lineTo(hitBall.x + Math.cos(targetAngle)*120, hitBall.y + Math.sin(targetAngle)*120);
+                ctx.strokeStyle = hitBall.color; ctx.lineWidth = 3; ctx.stroke();
+            }
+        }
+
+        // --- Top Güncellemeleri ---
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let b = balls[i]; 
+            b.update();
+
+            if (!b.isShrinking) {
+                pockets.forEach(p => {
+                    if (Math.sqrt((b.x-p.x)**2 + (b.y-p.y)**2) < pocketRadius) {
+                        b.isShrinking = true; b.targetPocket = p; b.dx = 0; b.dy = 0;
+                    }
+                });
+            } else if (b.scale <= 0) {
+                const pot = balls.splice(i, 1)[0];
+                if (pot.isCue) { 
+                    setTimeout(() => balls.push(new Ball(200, 200, '#ffffff', true)), 400); 
+                    score = Math.max(0, score-1);
+                    showStatusMessage("FAUL! -1", "error");
+                } else {
+                    pot.trayX = -30;
+                    incomingBalls.unshift(pot);
+                    if (pot.num === 8) endGame(balls.length === 1);
+                    else {
+                        score++;
+                        const phrases = ["MÜKEMMEL!", "HARİKA!", "BOOM!", "SÜPER!", "TAM İSABET!"];
+                        showStatusMessage(phrases[Math.floor(Math.random()*phrases.length)], "success");
+                    }
+                }
+                scoreEl.innerText = score.toString().padStart(2, '0');
+            }
+        }
+
+        // Fizik Çarpışmaları
+        for (let i = 0; i < balls.length; i++) {
+            for (let j = i + 1; j < balls.length; j++) {
+                let b1 = balls[i], b2 = balls[j];
+                if (b1.isShrinking || b2.isShrinking) continue;
+                let d = Math.sqrt((b2.x-b1.x)**2 + (b2.y-b1.y)**2);
+                if (d < ballRadius*2) {
+                    let angle = Math.atan2(b2.y-b1.y, b2.x-b1.x);
+                    let overlap = ballRadius*2 - d;
+                    b1.x -= Math.cos(angle)*overlap/2; b1.y -= Math.sin(angle)*overlap/2;
+                    b2.x += Math.cos(angle)*overlap/2; b2.y += Math.sin(angle)*overlap/2;
+                    let v1 = Math.sqrt(b1.dx**2+b1.dy**2), v2 = Math.sqrt(b2.dx**2+b2.dy**2);
+                    let dir1 = Math.atan2(b1.dy, b1.dx), dir2 = Math.atan2(b2.dy, b2.dx);
+                    let vx1 = v1*Math.cos(dir1-angle), vy1 = v1*Math.sin(dir1-angle);
+                    let vx2 = v2*Math.cos(dir2-angle), vy2 = v2*Math.sin(dir2-angle);
+                    b1.dx = Math.cos(angle)*vx2 + Math.cos(angle+Math.PI/2)*vy1;
+                    b1.dy = Math.sin(angle)*vx2 + Math.sin(angle+Math.PI/2)*vy1;
+                    b2.dx = Math.cos(angle)*vx1 + Math.cos(angle+Math.PI/2)*vy2;
+                    b2.dy = Math.sin(angle)*vx1 + Math.sin(angle+Math.PI/2)*vy2;
+                }
+            }
+        }
+    }
+
+    function endGame(win) {
+        isGameActive = false;
+        document.getElementById('statusTitle').innerText = win ? "KAZANDIN!" : "KAYBETTİN!";
+        document.getElementById('statusTitle').className = `text-5xl font-black mb-4 italic tracking-tighter ${win ? 'text-emerald-400' : 'text-red-500'}`;
+        document.getElementById('statusIcon').innerText = win ? "🏆" : "💀";
+        document.getElementById('btnText').innerText = "TEKRAR OYNA";
+        overlay.style.display = 'flex';
+    }
+
+    const getM = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    canvas.addEventListener('mousedown', (e) => {
+        if(!isGameActive) return;
+        const m = getM(e); const cue = balls.find(b => b.isCue);
+        if (cue && Math.sqrt((m.x-cue.x)**2 + (m.y-cue.y)**2) < 60 && cue.dx === 0 && cue.dy === 0) { isDragging = true; mousePos = m; }
+    });
+    canvas.addEventListener('mousemove', (e) => { if (isDragging) mousePos = getM(e); });
+    window.addEventListener('mouseup', () => {
+        if (isDragging) {
+            const cue = balls.find(b => b.isCue);
+            if(cue) {
+                const angle = Math.atan2(cue.y - mousePos.y, cue.x - mousePos.x);
+                const power = Math.min(Math.sqrt((cue.x-mousePos.x)**2 + (cue.y-mousePos.y)**2)*0.22, 28);
+                cue.dx = Math.cos(angle)*power; cue.dy = Math.sin(angle)*power;
+            }
+            isDragging = false;
+        }
+    });
+
+    animate();
+</script>
+</body>
+</html>

@@ -24,42 +24,44 @@
         .status-msg { animation: message-up 1.2s forwards; }
     </style>
 </head>
-<body class="bg-slate-950 h-screen flex flex-col items-center justify-center text-white select-none overflow-hidden">
+<body class="bg-slate-950 h-screen flex flex-col items-center justify-center text-white select-none overflow-hidden touch-none">
 
     <div id="gameOverlay" class="overlay fixed inset-0 z-50 items-center justify-center bg-black/80">
-        <div class="bg-slate-900 border border-white/10 p-12 rounded-[3rem] text-center shadow-2xl max-w-md w-full mx-4">
-            <div id="statusIcon" class="text-7xl mb-6 animate-bounce">8️⃣</div>
-            <h2 id="statusTitle" class="text-5xl font-black mb-4 italic tracking-tighter text-emerald-400">PRO POOL</h2>
-            <div id="statusDesc" class="text-slate-400 mb-8 space-y-2 text-sm">
+        <div class="bg-slate-900 border border-white/10 p-6 md:p-12 rounded-[2rem] md:rounded-[3rem] text-center shadow-2xl max-w-md w-full mx-4">
+            <div id="statusIcon" class="text-5xl md:text-7xl mb-4 md:mb-6 animate-bounce">8️⃣</div>
+            <h2 id="statusTitle" class="text-4xl md:text-5xl font-black mb-4 italic tracking-tighter text-emerald-400">PRO POOL</h2>
+            <div id="statusDesc" class="text-slate-400 mb-6 md:mb-8 space-y-2 text-sm md:text-base">
                 <p>• Beyaz topu çek ve vuruş açısını ayarla.</p>
                 <p>• Tahmin çizgilerini kullanarak hedef al.</p>
                 <p class="text-amber-500 font-bold">• Siyah topu (8) en sona sakla!</p>
             </div>
-            <button onclick="startGame()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-2xl transition-all active:scale-95 shadow-lg">
+            <button onclick="startGame()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 md:py-5 rounded-2xl transition-all active:scale-95 shadow-lg">
                 <span id="btnText">OYUNA BAŞLA</span>
             </button>
         </div>
     </div>
 
-    <div class="w-full max-w-[850px] flex justify-between items-center mb-6 px-4">
+    <div class="w-full max-w-[850px] flex flex-col md:flex-row justify-between items-center mb-6 px-4 gap-4">
         <div class="flex items-center gap-6">
-            <div class="bg-slate-900 px-8 py-3 rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
-                <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest text-center mb-1">SKOR</p>
-                <p id="scoreBoard" class="text-3xl font-mono text-white font-bold leading-none text-center relative z-10">00</p>
+            <div class="bg-slate-900 px-6 py-2 md:px-8 md:py-3 rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
+                <p class="text-[8px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest text-center mb-1">SKOR</p>
+                <p id="scoreBoard" class="text-2xl md:text-3xl font-mono text-white font-bold leading-none text-center relative z-10">00</p>
             </div>
-            <h1 class="text-2xl font-black italic tracking-tighter">ULTIMATE<span class="text-emerald-500">POOL</span></h1>
+            <h1 class="text-xl md:text-2xl font-black italic tracking-tighter">ULTIMATE<span class="text-emerald-500">POOL</span></h1>
         </div>
-        <button onclick="showLobby()" class="bg-white/5 hover:bg-white/10 text-slate-400 font-bold px-6 py-3 rounded-xl transition-all border border-white/5">ANA MENÜ</button>
+        <button onclick="showLobby()" class="bg-white/5 hover:bg-white/10 text-slate-400 font-bold text-sm md:text-base px-5 py-2 md:px-6 md:py-3 rounded-xl transition-all border border-white/5 whitespace-nowrap">ANA MENÜ</button>
     </div>
 
-    <div class="relative p-8 bg-gradient-to-br from-[#3e2723] to-[#1a0f0d] rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,1)] border-b-[12px] border-black/40">
-        <div id="gameMessages" class="absolute inset-0 flex items-center justify-center pointer-events-none z-20"></div>
-        <canvas id="poolTable" width="800" height="400" class="pool-felt rounded-xl shadow-[inset_0_0_60px_rgba(0,0,0,0.8)] relative z-10"></canvas>
+    <div class="w-full px-2 md:px-0 flex justify-center">
+        <div class="relative p-2 md:p-8 bg-gradient-to-br from-[#3e2723] to-[#1a0f0d] rounded-[1.5rem] md:rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,1)] border-b-[8px] md:border-b-[12px] border-black/40 w-full max-w-[864px]">
+            <div id="gameMessages" class="absolute inset-0 flex items-center justify-center pointer-events-none z-20"></div>
+            <canvas id="poolTable" width="800" height="400" class="pool-felt rounded-xl shadow-[inset_0_0_60px_rgba(0,0,0,0.8)] relative z-10 w-full h-auto"></canvas>
+        </div>
     </div>
 
-    <div class="mt-8 w-[750px] h-20 bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-3xl flex items-center px-4 gap-4 shadow-inner relative overflow-hidden">
+    <div class="mt-4 md:mt-8 w-full max-w-[750px] h-16 md:h-20 bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-3xl flex items-center px-4 gap-4 shadow-inner relative overflow-hidden mx-auto">
         <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-black/40 to-transparent z-10 pointer-events-none"></div>
-        <canvas id="pocketTray" width="700" height="40" class="z-0"></canvas>
+        <canvas id="pocketTray" width="700" height="40" class="z-0 w-full h-full object-contain"></canvas>
     </div>
 
 <script>
@@ -280,20 +282,52 @@
     function endGame(win) {
         isGameActive = false;
         document.getElementById('statusTitle').innerText = win ? "KAZANDIN!" : "KAYBETTİN!";
-        document.getElementById('statusTitle').className = `text-5xl font-black mb-4 italic tracking-tighter ${win ? 'text-emerald-400' : 'text-red-500'}`;
+        document.getElementById('statusTitle').className = `text-4xl md:text-5xl font-black mb-4 italic tracking-tighter ${win ? 'text-emerald-400' : 'text-red-500'}`;
         document.getElementById('statusIcon').innerText = win ? "🏆" : "💀";
         document.getElementById('btnText').innerText = "TEKRAR OYNA";
         overlay.style.display = 'flex';
     }
 
-    const getM = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-    canvas.addEventListener('mousedown', (e) => {
+    const getM = (e) => { 
+        const r = canvas.getBoundingClientRect(); 
+        const scaleX = canvas.width / r.width;
+        const scaleY = canvas.height / r.height;
+        
+        let cx, cy;
+        if (e.touches && e.touches.length > 0) {
+            cx = e.touches[0].clientX;
+            cy = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            cx = e.changedTouches[0].clientX;
+            cy = e.changedTouches[0].clientY;
+        } else {
+            cx = e.clientX;
+            cy = e.clientY;
+        }
+
+        return { x: (cx - r.left) * scaleX, y: (cy - r.top) * scaleY }; 
+    }
+
+    const startDrag = (e) => {
         if(!isGameActive) return;
-        const m = getM(e); const cue = balls.find(b => b.isCue);
-        if (cue && Math.sqrt((m.x-cue.x)**2 + (m.y-cue.y)**2) < 60 && cue.dx === 0 && cue.dy === 0) { isDragging = true; mousePos = m; }
-    });
-    canvas.addEventListener('mousemove', (e) => { if (isDragging) mousePos = getM(e); });
-    window.addEventListener('mouseup', () => {
+        if(e.cancelable && e.type.startsWith('touch')) e.preventDefault();
+        
+        const m = getM(e); 
+        const cue = balls.find(b => b.isCue);
+        if (cue && Math.sqrt((m.x-cue.x)**2 + (m.y-cue.y)**2) < 60 && cue.dx === 0 && cue.dy === 0) { 
+            isDragging = true; 
+            mousePos = m; 
+        }
+    };
+
+    const moveDrag = (e) => { 
+        if (isDragging) {
+            if(e.cancelable && e.type.startsWith('touch')) e.preventDefault();
+            mousePos = getM(e); 
+        }
+    };
+
+    const endDrag = (e) => {
         if (isDragging) {
             const cue = balls.find(b => b.isCue);
             if(cue) {
@@ -303,7 +337,16 @@
             }
             isDragging = false;
         }
-    });
+    };
+
+    canvas.addEventListener('mousedown', startDrag);
+    canvas.addEventListener('touchstart', startDrag, { passive: false });
+    
+    canvas.addEventListener('mousemove', moveDrag);
+    canvas.addEventListener('touchmove', moveDrag, { passive: false });
+    
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchend', endDrag);
 
     animate();
 </script>
